@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = 
 OBJ = obj/main.o
-BIN = bin/my_test_project
+BIN = bin/compressify
 
 all: $(BIN)
 
