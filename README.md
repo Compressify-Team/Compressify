@@ -1,4 +1,4 @@
-# test_project
+# compressify
 
 這是一個基本的 C 專案範例，會輸出 "Hello, World!"。
 
