@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include "main.h"
+void foo() {
+    printf("foo\n");
+}
 
 
 void bmi_calculator() {
@@ -30,7 +33,11 @@ int main() {
     printf("Hello, World!\n");
     printf("Hello, World!!!!!!!!!!!!!!\n");
 
+
     bmi_calculator();
     
+
+    foo();
+
     return 0;
 }
