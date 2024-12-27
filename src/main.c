@@ -254,6 +254,7 @@ int main(int argc, char *argv[])
     printf("File content: %s\n", file_content);
     fclose(file);
 
+
     // Select the appropriate compression algorithm
     if (strcmp(algorithm, "huffman") == 0) 
     {
@@ -270,6 +271,7 @@ int main(int argc, char *argv[])
         free(file_content);
         return 1;
     }
+
 
     // Free allocated memory
     free(file_content);
