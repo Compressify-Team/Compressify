@@ -9,13 +9,42 @@ typedef struct Node {
     int freq;
     struct Node* lchild;
     struct Node* rchild;
-} 
-Node;
+} Node;
 
 // Frequency table and forest array
 int freq[MAX_CHAR] = {0};
 Node* forest[MAX_CHAR];
 int forest_size = 0;
+
+// Function to write a single bit to the output file using a buffer
+void writeBit(FILE* out_file, unsigned char* buffer, int* buffer_size, int bit) {
+    *buffer = (*buffer << 1) | (bit & 1);
+    (*buffer_size)++;
+
+    // If the buffer is full, write it to the file
+    if (*buffer_size == 8) {
+        fputc(*buffer, out_file);
+        *buffer_size = 0;
+        *buffer = 0;
+    }
+}
+
+// Function to serialize the Huffman Tree using pre-order traversal and bit-level storage
+void serializeTree(Node* root, FILE* out_file, unsigned char* buffer, int* buffer_size) {
+    if (!root) return;
+
+    if (!root->lchild && !root->rchild) {
+        // Write '1' to indicate a leaf node and write the character
+        writeBit(out_file, buffer, buffer_size, 1);
+        fputc(root->val, out_file); // Write the character for leaf nodes
+    } else {
+        // Write '0' to indicate an internal node
+        writeBit(out_file, buffer, buffer_size, 0);
+    }
+
+    serializeTree(root->lchild, out_file, buffer, buffer_size);
+    serializeTree(root->rchild, out_file, buffer, buffer_size);
+}
 
 // Function to create a new node
 Node* createNode(char val, int freq, Node* lchild, Node* rchild) {
@@ -51,6 +80,7 @@ void printCode(Node* node, char* code, int depth) {
     }
 }
 
+// Function to find the Huffman code for a specific character
 void findCode(Node* node, char* code, int depth, char target, char* result) {
     if (!node->lchild && !node->rchild) {
         if (node->val == target) {
@@ -69,91 +99,96 @@ void findCode(Node* node, char* code, int depth, char target, char* result) {
     }
 }
 
-char* encode(Node* root, const char* input) {
+// Function to encode the input string using the Huffman tree
+unsigned char* encode(Node* root, const char* input, size_t* encoded_len) {
     char code[256] = {0};
-    char result[256]= {0};
-    char* encoded = (char*) malloc(256);
-    if (encoded) {
-        encoded[0] = '\0'; // 確保是空字串
+    char result[256] = {0};
+    size_t len = strlen(input);
+    size_t max_bits = len * 8; // Maximum possible number of bits
+    unsigned char* encoded = (unsigned char*)malloc(max_bits / 8 + 1); // Allocate space for bits
+    if (encoded == NULL) {
+        perror("Memory allocation failed");
+        return NULL;
     }
-    for (int i = 0; input[i] != '\0'; i++) {
+
+    size_t bit_pos = 0;
+    for (size_t i = 0; input[i] != '\0'; i++) {
         findCode(root, code, 0, input[i], result);
-        encoded = strcat(encoded, result);
-        printf("%s", result);
+
+        // Add the encoded bits to the buffer
+        for (size_t j = 0; result[j] != '\0'; j++) {
+            if (bit_pos % 8 == 0) {
+                // Move to the next byte if necessary
+                encoded[bit_pos / 8] = 0;
+            }
+            encoded[bit_pos / 8] |= (result[j] - '0') << (7 - (bit_pos % 8));
+            bit_pos++;
+        }
     }
-    printf("\n");
+
+    *encoded_len = (bit_pos + 7) / 8;  // Round up to the nearest byte
     return encoded;
 }
 
-void decode(Node* root, const char* encodedString) {
-    Node* currentNode = root;
-    for (int i = 0; encodedString[i] != '\0'; i++) {
-        if (encodedString[i] == '0') {
-            currentNode = currentNode->lchild;
-        }
-        else {
-            currentNode = currentNode->rchild;
-        }
-        if (!currentNode->lchild && !currentNode->rchild) {
-            printf("%c", currentNode->val);
-            currentNode = root;
-        }
-    }
-    printf("\n");
-}
-
-// Function declarations for compression algorithms
-void huffman_compress(const char *file_content, size_t file_size, const char *input_file) 
-{
-    int c;
-    char encoded[256] = {0};
-    char output_file[256] = {0};
+// Function to perform Huffman compression
+void huffman_compress(const char *file_content, size_t file_size, const char *input_file) {
+    size_t len = strlen(file_content); 
+    char output_file[256];
     snprintf(output_file, sizeof(output_file), "%s.huf", input_file);
-    printf("Compressing %s to %s using Huffman Coding...\n", input_file, output_file);
-    //count the frequency of each character
-    for(int i = 0; i < MAX_CHAR; i++) {
-        int c = file_content[i];
-        freq[c]++;
+    printf("Compressing %s to %s using Huffman coding...\n", input_file, output_file);
+
+    // Calculate frequency of each character
+    memset(freq, 0, sizeof(freq));  // Reset frequency array
+    for (size_t i = 0; i < len; i++) {
+        freq[(unsigned char)file_content[i]]++;
     }
-    // Create nodes for each character with non-zero frequency
+
+    // Create nodes for characters with non-zero frequencies
     for (int i = 0; i < MAX_CHAR; i++) {
         if (freq[i] > 0) {
             forest[forest_size++] = createNode(i, freq[i], NULL, NULL);
         }
     }
+
     // Build the Huffman tree
     while (forest_size > 1) {
-        // Sort the forest by frequency
         qsort(forest, forest_size, sizeof(Node*), compare);
-
-        // Extract the two nodes with the smallest frequency
         Node* left = forest[0];
         Node* right = forest[1];
-
-        // Create a new parent node combining these two
         Node* parent = createNode(-1, left->freq + right->freq, left, right);
-
-        // Insert the new parent node back into the forest
-        forest[0] = parent; // Place parent at index 0
-
-        // Shift remaining elements in the forest down by one position
+        forest[0] = parent;
         for (int i = 1; i < forest_size - 1; i++) {
             forest[i] = forest[i + 1];
         }
-        
-        // Decrease the size of the forest
         forest_size--;
     }
 
-    // Print the Huffman codes
-    char code[MAX_CHAR];
-    //printCode(forest[0], code, 0);
-    strcpy(encoded, encode(forest[0], file_content));
-    printf("Decoded: \n");
-    decode(forest[0], encoded);
+    // Open output file for writing
+    FILE *out_file = fopen(output_file, "wb");
+    if (out_file == NULL) {
+        perror("Error opening output file");
+        return;
+    }
 
+    unsigned char buffer = 0;
+    int buffer_size = 0;
 
-    // Free memory (post-order travesrsal to free nodes)
+    // Serialize the Huffman tree with bit-level storage
+    serializeTree(forest[0], out_file, &buffer, &buffer_size);
+
+    // Encode the file content and write to the output file
+    size_t encoded_len = 0;
+    unsigned char* encoded_content = encode(forest[0], file_content, &encoded_len);
+    if (!encoded_content) {
+        perror("Encoding failed");
+        fclose(out_file);
+        return;
+    }
+
+    // Write the encoded content to the file (as a bit stream)
+    fwrite(encoded_content, 1, encoded_len, out_file);
+
+    // Free the allocated memory (post-order traversal to free nodes)
     Node* stack[MAX_CHAR];
     int stack_size = 0;
     Node* last_visited = NULL;
@@ -177,51 +212,19 @@ void huffman_compress(const char *file_content, size_t file_size, const char *in
         }
     }
 
-    // Open the output file for writing
-    FILE *out_file = fopen(output_file, "wb");
-    if (out_file == NULL) {
-        perror("Error opening output file");
-        return;
-    }
-    printf("Encoded: %s\n", encoded);
-    // TODO: Add Huffman Coding implementation here
-    fputs(encoded, out_file);
-    // Close the output file
-    fclose(out_file);
-}
-
-void arithmetic_compress(const char *file_content, size_t file_size, const char *input_file) 
-{
-    char output_file[256];
-    snprintf(output_file, sizeof(output_file), "%s.arc", input_file);
-    printf("Compressing %s to %s using Arithmetic Coding...\n", input_file, output_file);
-
-    // Open the output file for writing
-    FILE *out_file = fopen(output_file, "wb");
-    if (out_file == NULL) {
-        perror("Error opening output file");
-        return;
-    }
-
-    // TODO: Add Arithmetic Coding implementation here
-    fprintf(out_file, "Example compressed content (Arithmetic)\n");
-
-    // Close the output file
+    free(encoded_content);
     fclose(out_file);
 }
 
 // Function to display usage information
-void show_help() 
-{
+void show_help() {
     printf("Usage: compress [algorithm] input_file\n");
 }
 
 // Main function
-int main(int argc, char *argv[]) 
-{
+int main(int argc, char *argv[]) {
     // Check if the correct number of arguments is provided
-    if (argc != 3) 
-    {
+    if (argc != 3) {
         show_help();
         return 1;
     }
@@ -254,24 +257,16 @@ int main(int argc, char *argv[])
     printf("File content: %s\n", file_content);
     fclose(file);
 
-
     // Select the appropriate compression algorithm
-    if (strcmp(algorithm, "huffman") == 0) 
-    {
+    if (strcmp(algorithm, "huffman") == 0) {
         huffman_compress(file_content, file_size, input_file);
     } 
-    else if (strcmp(algorithm, "arithmetic") == 0) 
-    {
-        arithmetic_compress(file_content, file_size, input_file);
-    } 
-    else 
-    {
+    else {
         printf("Error: Unknown algorithm '%s'.\n", algorithm);
         show_help();
         free(file_content);
         return 1;
     }
-
 
     // Free allocated memory
     free(file_content);
