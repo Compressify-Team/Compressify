@@ -79,23 +79,6 @@ int compare(const void* a, const void* b) {
     return nodeA->freq - nodeB->freq;
 }
 
-// Function to print the Huffman codes
-void printCode(Node* node, char* code, int depth) {
-    if (!node->lchild && !node->rchild) {
-        code[depth] = '\0';
-        printf("'%c' (freq = %d) --> %s\n", node->val, freq[(unsigned char)node->val], code);
-        return;
-    }
-    if (node->lchild) {
-        code[depth] = '0';
-        printCode(node->lchild, code, depth + 1);
-    }
-    if (node->rchild) {
-        code[depth] = '1';
-        printCode(node->rchild, code, depth + 1);
-    }
-}
-
 // Function to find the Huffman code for a specific character
 void findCode(Node* node, char* code, int depth, char target, char* result) {
     if (!node->lchild && !node->rchild) {
@@ -183,7 +166,8 @@ Node* deserializeTree(FILE* in_file) {
         }
         printf("Deserialized leaf node: %c\n", val); // Debug: Output leaf node value
         return createNode(val, 0, NULL, NULL);
-    } else {
+    } 
+    else {
         // Internal node
         Node* left = deserializeTree(in_file);
         Node* right = deserializeTree(in_file);
@@ -231,7 +215,8 @@ void decompress_huffman(const char *file_content, size_t file_size, const char *
         // Traverse the tree based on the bit
         if (bit == 0) {
             current = current->lchild;
-        } else {
+        } 
+        else {
             current = current->rchild;
         }
 
@@ -253,7 +238,8 @@ void decompress_huffman(const char *file_content, size_t file_size, const char *
         if (root_node) {
             stack[stack_size++] = root_node;
             root_node = root_node->lchild;
-        } else {
+        } 
+        else {
             Node* peek_node = stack[stack_size - 1];
             if (peek_node->rchild && last_visited != peek_node->rchild) {
                 root_node = peek_node->rchild;
