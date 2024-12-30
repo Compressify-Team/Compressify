@@ -46,21 +46,22 @@ void arithmetic_compress(const char *file_content, size_t file_size, const char 
 // Function to display usage information
 void show_help() 
 {
-    printf("Usage: compress [algorithm] input_file\n");
+    printf("Usage: ./main -c/-d [algorithm] [input_file]\n");
 }
 
 // Main function
 int main(int argc, char *argv[]) 
 {
     // Check if the correct number of arguments is provided
-    if (argc != 3) 
+    if (argc != 4) 
     {
         show_help();
         return 1;
     }
 
-    const char *algorithm = argv[1];
-    const char *input_file = argv[2];
+    const char *mode = argv[1];
+    const char *algorithm = argv[2];
+    const char *input_file = argv[3];
 
     // Open the input file for reading
     FILE *file = fopen(input_file, "rb");
@@ -87,25 +88,54 @@ int main(int argc, char *argv[])
     printf("File content: %s\n", file_content);
     fclose(file);
 
-
-    // Select the appropriate compression algorithm
-    if (strcmp(algorithm, "huffman") == 0) 
+    // Select the appropriate operation and compression algorithm
+    if (strcmp(mode, "-c") == 0) 
     {
-        huffman_compress(file_content, file_size, input_file);
+        if (strcmp(algorithm, "huffman") == 0) 
+        {
+            huffman_compress(file_content, file_size, input_file);
+        } 
+        else if (strcmp(algorithm, "arithmetic") == 0) 
+        {
+            arithmetic_compress(file_content, file_size, input_file);
+        } 
+        else 
+        {
+            printf("Error: Unknown algorithm '%s'.\n", algorithm);
+            show_help();
+            free(file_content);
+            return 1;
+        }
     } 
-    else if (strcmp(algorithm, "arithmetic") == 0) 
+    else if (strcmp(mode, "-d") == 0) 
     {
-        arithmetic_compress(file_content, file_size, input_file);
-    } 
-    else 
-    {
-        printf("Error: Unknown algorithm '%s'.\n", algorithm);
-        show_help();
-        free(file_content);
-        return 1;
-    }
-
-
+        // TODO: Add decompression logic here
+        printf("Decompression is not implemented yet.\n");
+        if (strcmp(algorithm, "huffman") == 0) 
+        {
+            // TODO: Add Huffman decompression implementation here
+            printf("Decompressing %s using Huffman Coding...\n", input_file);
+        } 
+        else if (strcmp(algorithm, "arithmetic") == 0) 
+        {
+            // TODO: Add Arithmetic decompression implementation here
+            printf("Decompressing %s using Arithmetic Coding...\n", input_file);
+        } 
+        else 
+        {
+            printf("Error: Unknown algorithm '%s'.\n", algorithm);
+            show_help();
+            free(file_content);
+            return 1;
+        }
+        } 
+        else 
+        {
+            printf("Error: Unknown mode '%s'.\n", mode);
+            show_help();
+            free(file_content);
+            return 1;
+        }
     // Free allocated memory
     free(file_content);
 
