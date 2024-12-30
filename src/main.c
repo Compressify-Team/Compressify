@@ -45,7 +45,7 @@ void serializeTree(Node* root, FILE* out_file, unsigned char* buffer, int* buffe
     if (!root) return;
 
     if (!root->lchild && !root->rchild) {
-        printf("Serializing leaf node: %c\n", root->val); // Debug: Output leaf node value
+        //printf("Serializing leaf node: %c\n", root->val); // Debug: Output leaf node value
         // Write '1' to indicate a leaf node and write the character
         writeBit(out_file, buffer, buffer_size, 1);
          // Write the ASCII value of the leaf node bit by bit
@@ -83,7 +83,7 @@ int compare(const void* a, const void* b) {
 void findCode(Node* node, char* code, int depth, char target, char* result) {
     if (!node->lchild && !node->rchild) {
         if (node->val == target) {
-            printf("Character '%c' found in tree.\n", target); // Debug: Output character found in tree
+            //printf("Character '%c' found in tree.\n", target); // Debug: Output character found in tree
             if (depth == 0) {
                 // Special case: if the tree has only one character, its code should be '0'
                 code[depth] = '0';
@@ -92,7 +92,7 @@ void findCode(Node* node, char* code, int depth, char target, char* result) {
             else {
                 code[depth] = '\0';
             }
-            printf("Code for character '%c': %s\n", target, code); // Debug: Output code for the character
+            //printf("Code for character '%c': %s\n", target, code); // Debug: Output code for the character
             strcpy(result, code);
         }
         return;
@@ -109,7 +109,7 @@ void findCode(Node* node, char* code, int depth, char target, char* result) {
 
 // Function to encode the input string using the Huffman tree
 unsigned char* encode(Node* root, const char* input, size_t* encoded_len) {
-    printf("Input: %s\n", input);
+    //printf("Input: %s\n", input);
     char code[256] = {0};
     char result[256] = {0};
     size_t len = strlen(input);
@@ -123,7 +123,7 @@ unsigned char* encode(Node* root, const char* input, size_t* encoded_len) {
     size_t bit_pos = 0;
     for (size_t i = 0; input[i] != '\0'; i++) {
         findCode(root, code, 0, input[i], result);
-        printf("Character '%c' encoded as %s\n", input[i], result); // Debug: Output encoded character and its code
+        //printf("Character '%c' encoded as %s\n", input[i], result); // Debug: Output encoded character and its code
         // Add the encoded bits to the buffer
         for (size_t j = 0; result[j] != '\0'; j++) {
             if (bit_pos % 8 == 0) {
@@ -211,7 +211,7 @@ void decompress_huffman(const char *file_content, size_t file_size, const char *
 
         int bit = (buffer >> (bit_pos - 1)) & 1;
         bit_pos--;
-        printf("Read bit: %d\n", bit); // Debug: Output bit value
+        //printf("Read bit: %d\n", bit); // Debug: Output bit value
         // Traverse the tree based on the bit
         if (bit == 0) {
             current = current->lchild;
@@ -222,7 +222,7 @@ void decompress_huffman(const char *file_content, size_t file_size, const char *
 
         // If a leaf node is reached, write the character to the output file
         if (!current->lchild && !current->rchild) {
-            printf("Decoded character: %c\n", current->val); // Debug: Output decoded character
+            //printf("Decoded character: %c\n", current->val); // Debug: Output decoded character
             fputc(current->val, out_file);
             current = root; // Reset to root for the next character
         }
@@ -244,7 +244,7 @@ void decompress_huffman(const char *file_content, size_t file_size, const char *
             if (peek_node->rchild && last_visited != peek_node->rchild) {
                 root_node = peek_node->rchild;
             } else {
-                printf("Freeing node: %c\n", peek_node->val); // Debug: Output node being freed
+                //printf("Freeing node: %c\n", peek_node->val); // Debug: Output node being freed
                 free(peek_node);
                 last_visited = peek_node;
                 stack_size--;
@@ -277,8 +277,9 @@ void arithmetic_compress(const char *file_content, size_t file_size, const char 
     // Close the output file
     fclose(out_file);
 }
+
 // Function to perform Huffman compression
-void huffman_compress(const char *file_content, size_t file_size, const char *input_file) {
+int huffman_compress(const char *file_content, size_t file_size, const char *input_file) {
     size_t len = strlen(file_content); 
     char output_file[256];
     snprintf(output_file, sizeof(output_file), "%s.huf", input_file);
@@ -314,7 +315,7 @@ void huffman_compress(const char *file_content, size_t file_size, const char *in
     FILE *out_file = fopen(output_file, "wb");
     if (out_file == NULL) {
         perror("Error opening output file");
-        return;
+        return 0;
     }
 
     unsigned char buffer = 0;
@@ -336,20 +337,20 @@ void huffman_compress(const char *file_content, size_t file_size, const char *in
     if (!encoded_content) {
         perror("Encoding failed");
         fclose(out_file);
-        return;
+        return 0;
     }
     // Print encoded content in binary form
-    printf("Encoded content in binary form:\n");
-    for (size_t i = 0; i < encoded_len; i++) {
-        for (int j = 7; j >= 0; j--) {
-            printf("%d", (encoded_content[i] >> j) & 1);
-        }
-        printf(" ");
-    }
-    printf("\n");
-    // print encoded_len 
-    printf("Encoded length: %zu\n", encoded_len);
-    // Write the encoded content to the file
+    // printf("Encoded content in binary form:\n");
+    // for (size_t i = 0; i < encoded_len; i++) {
+    //     for (int j = 7; j >= 0; j--) {
+    //         printf("%d", (encoded_content[i] >> j) & 1);
+    //     }
+    //     printf(" ");
+    // }
+    // printf("\n");
+    // // print encoded_len 
+    // printf("Encoded length: %zu\n", encoded_len);
+    // // Write the encoded content to the file
     fwrite(encoded_content, 1, encoded_len, out_file);
 
     // Free the allocated memory (post-order traversal to free nodes)
@@ -375,9 +376,12 @@ void huffman_compress(const char *file_content, size_t file_size, const char *in
             }
         }
     }
-
+    //calculate the size of the compressed file
+    fseek(out_file, 0, SEEK_END);
+    size_t compressed_size = ftell(out_file);
     free(encoded_content);
     fclose(out_file);
+    return compressed_size;
 }
 
 // Function to display usage information
@@ -410,6 +414,8 @@ int main(int argc, char *argv[]) {
     fseek(file, 0, SEEK_END);
     size_t file_size = ftell(file);
     rewind(file);
+    //store the input file size
+    printf("Input file size: %zu bytes\n", file_size);
 
     // Allocate memory to hold the file content
     char *file_content = (char *)malloc(file_size);
@@ -428,7 +434,13 @@ int main(int argc, char *argv[]) {
     {
         if (strcmp(algorithm, "huffman") == 0) 
         {
-            huffman_compress(file_content, file_size, input_file);
+            int compressed_size = huffman_compress(file_content, file_size, input_file);
+            if(compressed_size != 0){
+                //calculate the compression ratio
+                printf("Compressed file size: %d bytes\n", compressed_size);
+                double compression_ratio = (double)compressed_size / (double)file_size;
+                printf("Compression ratio: %.2f\n", compression_ratio);
+            }
         } 
         else if (strcmp(algorithm, "arithmetic") == 0) 
         {
