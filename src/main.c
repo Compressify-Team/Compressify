@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 #include "arith_cod.h"
 
 // Function declarations for compression algorithms
@@ -25,85 +26,112 @@ void huffman_compress(const char *file_content, size_t file_size, const char *in
     fclose(out_file);
 }
 
-void arithmetic_compress(const char *file_content, size_t file_size, const char *input_file) 
-{
-    char output_file[256];
-    snprintf(output_file, sizeof(output_file), "%s.arc", input_file);
-    printf("Compressing %s to %s using Arithmetic Coding...\n", input_file, output_file);
+size_t calculate_output_size(const unsigned char *output, size_t max_size) {
+    size_t size = 0;
+    while (size < max_size && output[size] != '\0') {
+        size++;
+    }
+    return size;
+}
 
+void arithmetic_compress(const char *file_content, size_t file_size, const char *input_file) {
+    size_t input_size = strlen(file_content);
+
+    size_t output_size = input_size * 2; // 預估輸出大小
+
+    unsigned char* input = (unsigned char*)file_content;
+    unsigned char* output = calloc(sizeof(unsigned char) * output_size, 1);
+
+    // 初始化編碼狀態
+    ac_state_t encoder_state;
+    init_state(&encoder_state, 16);
+
+    // 建立機率表
+    build_probability_table(&encoder_state, input, input_size);
+
+    // 編碼
+    printf("Encoding...\n");
+
+    encode_value(output, input, input_size, &encoder_state);
+
+    // 將結果寫入 .arc 檔案
+    char output_file[256];
+
+    snprintf(output_file, sizeof(output_file), "%s.arc", input_file);
     FILE *out_file = fopen(output_file, "wb");
     if (out_file == NULL) {
         perror("Error opening output file");
+        free(output);
         return;
     }
-
-
-    ac_state_t state;
-    init_state(&state, 16); // 假設使用 16-bit fraction 範圍是 [0, 2^16)
-
-    // 2. 建立機率表
-    build_probability_table(&state, (unsigned char*)file_content, (int)file_size);
-
-    // 3. 分配緩衝區
-    //   預估壓縮後大小 (此處簡化直接分配 file_size bytes 空間)
-    unsigned char *compressed_data = (unsigned char*)calloc(file_size, 1);
-
-    if (!compressed_data) {
-        perror("Memory allocation failed");
-        fclose(out_file);
-        return;
-    }
-
-    // 4. 執行編碼
-    encode_value(compressed_data, (unsigned char*)file_content, file_size, &state);
-
-    // 5. 計算實際使用的位元 (state.out_index)，轉為位元組並寫入檔案
-    int total_bits = state.out_index;
-    int total_bytes = (total_bits + 7) / 8; // 向上取整
-    fwrite(compressed_data, 1, total_bytes, out_file);
-
-    // 解壓縮並檢查結果
-    arithmetic_decompress_memory(compressed_data, total_bytes, file_size);
-
-
-    // 清理
-    free(compressed_data);
-    free(state.prob_table);
-    free(state.cumul_table);
-    fclose(out_file);
-
-    // 解壓縮並檢查結果
-    /*
-    char decompressed_output_file[256];
-    snprintf(decompressed_output_file, sizeof(decompressed_output_file), "%s.txt", input_file);
-    arithmetic_decompress(output_file, decompressed_output_file);
-    */
     
+    // 計算實際輸出大小
+    size_t actual_output_size = calculate_output_size(output, output_size);
+
+    fwrite(&input_size, sizeof(size_t), 1, out_file);
+    printf("input_size: %zu\n", input_size);
+
+    //fwrite(&encoder_state, sizeof(ac_state_t), 1, out_file);
+    // 單獨寫入 encoder_state 的每個成員
+
+    fwrite(encoder_state.prob_table, sizeof(int), 256, out_file); // 假設 prob_table 大小為 256
+    fwrite(encoder_state.cumul_table, sizeof(int), 257, out_file); // 假設 cumul_table 大小為 256
+    fwrite(&encoder_state.frac_size, sizeof(int), 1, out_file);
+    fwrite(&encoder_state.one_counter, sizeof(int), 1, out_file);
+    fwrite(&encoder_state.current_index, sizeof(int), 1, out_file);
+    fwrite(&encoder_state.out_index, sizeof(int), 1, out_file);
+    fwrite(&encoder_state.last_symbol, sizeof(int), 1, out_file);
+    fwrite(&encoder_state.current_symbol, sizeof(unsigned char), 1, out_file);
+    fwrite(&encoder_state.base, sizeof(int), 1, out_file);
+    fwrite(&encoder_state.length, sizeof(int), 1, out_file);
+
+
+
+    fwrite(output, sizeof(unsigned char), output_size, out_file);
+    printf("output cotent: %s\n", output);
+
+    printf("actual_output_size: %zu\n", actual_output_size);
+
+    //print all encoder_state
+    printf("ac_state_t:\n");
+    printf("  frac_size: %d\n", encoder_state.frac_size);
+    printf("  one_counter: %d\n", encoder_state.one_counter);
+    printf("  current_index: %d\n", encoder_state.current_index);
+    printf("  out_index: %d\n", encoder_state.out_index);
+    printf("  last_symbol: %d\n", encoder_state.last_symbol);
+    printf("  current_symbol: %c\n", encoder_state.current_symbol);
+    printf("  base: %d\n", encoder_state.base);
+    printf("  length: %d\n", encoder_state.length);
+
+
+    printf("Decoding...\n");
+    unsigned char* decomp = calloc(sizeof(unsigned char) * input_size,1); // 解碼後的大小應該與輸入大小相同
+    decode_value(decomp, output, &encoder_state, input_size);
+
+    // 輸出結果
+    printf("Decoded string: %s\n", decomp);
+
+
+    fclose(out_file);
+    free(decomp);
+    free(output);
+
+
+
+    //arithmetic_decompress(output_file);
 }
 
-void arithmetic_decompress_memory(const unsigned char *compressed_data, size_t compressed_size, size_t original_size) {
-    printf("Decompressing from memory using Arithmetic Coding...\n");
 
-    ac_state_t state;
-    init_state(&state, 16); // 假設使用 16-bit fraction
 
-    unsigned char *decompressed_data = (unsigned char*)malloc(original_size);
-    if (!decompressed_data) {
-        perror("Memory allocation failed");
-        return;
-    }
+void arithmetic_decompress(const char *input_file) {
+    // 從 .arc 檔案中讀取資料
+    //char input_arc_file[256];
+    // 初始化編碼狀態
+    ac_state_t encoder_state;
 
-    decode_value(decompressed_data, compressed_data, &state, original_size);
+    init_state(&encoder_state, 16);
 
-    // 顯示解壓縮後的結果
-    printf("Decompressed data: %s\n", decompressed_data);
-
-    free(decompressed_data);
-}
-
-/*
-void arithmetic_decompress(const char *input_file, const char *output_file) {
-    printf("Decompressing %s to %s using Arithmetic Coding...\n", input_file, output_file);
+    printf("Decompressing %s using Arithmetic Coding...\n", input_file);
 
     FILE *in_file = fopen(input_file, "rb");
     if (in_file == NULL) {
@@ -111,59 +139,69 @@ void arithmetic_decompress(const char *input_file, const char *output_file) {
         return;
     }
 
+    size_t input_size;
 
 
-    fseek(in_file, 0, SEEK_END);
-    size_t file_size = ftell(in_file);
-    fseek(in_file, 0, SEEK_SET);
+    fread(&input_size, sizeof(size_t), 1, in_file);
+
+    // 分配記憶體給 prob_table 和 cumul_table
+    encoder_state.prob_table = malloc(sizeof(int) * 256); // 假設 prob_table 大小為 256
+    encoder_state.cumul_table = malloc(sizeof(int) * 257); // 假設 cumul_table 大小為 256
+
+    // 單獨讀取 encoder_state 的每個成員
+    fread(encoder_state.prob_table, sizeof(int), 256, in_file);
+    fread(encoder_state.cumul_table, sizeof(int), 257, in_file);
+    fread(&encoder_state.frac_size, sizeof(int), 1, in_file);
+    fread(&encoder_state.one_counter, sizeof(int), 1, in_file);
+    fread(&encoder_state.current_index, sizeof(int), 1, in_file);
+    fread(&encoder_state.out_index, sizeof(int), 1, in_file);
+    fread(&encoder_state.last_symbol, sizeof(int), 1, in_file);
+    fread(&encoder_state.current_symbol, sizeof(unsigned char), 1, in_file);
+    fread(&encoder_state.base, sizeof(int), 1, in_file);
+    fread(&encoder_state.length, sizeof(int), 1, in_file);
 
 
+    //fread(&encoder_state, sizeof(ac_state_t), 1, in_file);
 
-    unsigned char *compressed_data = (unsigned char*)calloc(file_size, 1);
-    if (!compressed_data) {
-        perror("Memory allocation failed");
-        fclose(in_file);
-        return;
-    }
+    size_t output_size = input_size*2; // 計算實際輸出大小
+    unsigned char* output = calloc(sizeof(unsigned char) * output_size,1);
+    unsigned char* decomp = calloc(sizeof(unsigned char) * input_size,1); // 解碼後的大小應該與輸入大小相同
 
-    size_t read_size = fread(compressed_data, 1, file_size, in_file);
-    if (read_size != file_size) {
-        perror("Error reading input file");
-        free(compressed_data);
-        fclose(in_file);
-        return;
-    }
+    fread(output, sizeof(unsigned char), output_size , in_file);
 
     fclose(in_file);
 
-    ac_state_t state;
-    init_state(&state, 16); // 假設使用 16-bit fraction
+    printf("Input size: %zu\n", input_size);
+    
+        //print all encoder_state
+    printf("ac_state_t2:\n");
+    printf("  frac_size: %d\n", encoder_state.frac_size);
+    printf("  one_counter: %d\n", encoder_state.one_counter);
+    printf("  current_index: %d\n", encoder_state.current_index);
+    printf("  out_index: %d\n", encoder_state.out_index);
+    printf("  last_symbol: %d\n", encoder_state.last_symbol);
+    printf("  current_symbol: %c\n", encoder_state.current_symbol);
+    printf("  base: %d\n", encoder_state.base);
+    printf("  length: %d\n", encoder_state.length);
+    printf("cumul %d",encoder_state.cumul_table[256]);
 
-    unsigned char *decompressed_data = (unsigned char*)malloc(file_size * 2); // 假設解壓後大小不超過原大小的兩倍
-    if (!decompressed_data) {
-        perror("Memory allocation failed");
-        free(compressed_data);
-        return;
-    }
 
-    decode_value(decompressed_data, compressed_data, &state, file_size * 2);
+    printf("output cotent: %s\n", output);
+    // 解碼
+    printf("Decoding...\n");
 
-    FILE *out_file = fopen(output_file, "wb");
-    if (out_file == NULL) {
-        perror("Error opening output file");
-        free(compressed_data);
-        free(decompressed_data);
-        return;
-    }
+    decode_value(decomp, output, &encoder_state, input_size);
 
-    fwrite(decompressed_data, 1, state.out_index, out_file);
+    // 輸出結果
+    printf("Decoded string: %s\n", decomp);
 
-    free(compressed_data);
-    free(decompressed_data);
-    fclose(out_file);
+    // 釋放記憶體
+    free(output);
+    free(decomp);
 }
 
-*/
+
+
 
 // Function to display input prompt
 void show_prompt()
@@ -192,6 +230,9 @@ int main(int argc, char *argv[])
     printf("Algorithm: %s\n", algorithm);
     printf("Input file: %s\n", input_file);
 
+    arithmetic_decompress(input_file);
+
+   /*
     // Open the input file for reading
     FILE *file = fopen(input_file, "rb");
     if (file == NULL) {
@@ -218,11 +259,16 @@ int main(int argc, char *argv[])
     printf("File content: %s\n", file_content);
     fclose(file);
 
-    char output_file[100]="output.txt";
 
-    //arithmetic_decompress(input_file, output_file);
+    arithmetic_compress(file_content, file_size, input_file);
+
+    
+*/
 
 
+
+    
+/*
     // Select the appropriate compression algorithm
     if (strcmp(algorithm, "huffman") == 0) 
     {
@@ -238,11 +284,16 @@ int main(int argc, char *argv[])
         free(file_content);
         return 1;
     }
+    */
+    
+    
 
     
 
     // Free allocated memory
-    free(file_content);
+    //free(file_content);
+    
+    
 
 
     return 0;
