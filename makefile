@@ -1,20 +1,35 @@
 CC = gcc
-CFLAGS = 
-OBJ = obj/main.o
-BIN = bin/compressify
+CFLAGS = -Wall -Wextra -std=c99
+LDFLAGS =
 
-all: $(BIN)
+# Source files
+SRCS = src/main.c src/arith_cod.c
 
+# Object files
+OBJS = $(patsubst src/%.c, obj/%.o, $(SRCS))
+
+# Executable name
+TARGET = bin/compressify
+
+# Default target
+all: $(TARGET)
+
+# Link the executable
+$(TARGET): $(OBJS)
+	@mkdir -p bin
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)
+
+# Compile source files to object files
 obj/%.o: src/%.c
-	$(CC) -c -o $@ $< $(CFLAGS)
+	@mkdir -p obj
+	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BIN): $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS)
+run: $(TARGET)
+	./$(TARGET)
 
-run: $(BIN)
-	./$(BIN)
-
-.PHONY: clean
-
+# Clean up build files
 clean:
-	rm -f obj/*.o bin/*
+	rm -f obj/*.o bin/$(TARGET)
+
+# Phony targets
+.PHONY: all clean run
