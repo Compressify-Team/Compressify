@@ -164,7 +164,7 @@ Node* deserializeTree(FILE* in_file) {
         for (int i = 0; i < 8; i++) {
             val = (val << 1) | readBit();
         }
-        printf("Deserialized leaf node: %c\n", val); // Debug: Output leaf node value
+        //printf("Deserialized leaf node: %c\n", val); // Debug: Output leaf node value
         return createNode(val, 0, NULL, NULL);
     } 
     else {
