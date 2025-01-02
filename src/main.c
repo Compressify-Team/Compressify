@@ -426,18 +426,18 @@ void arithmetic_compress(const char *file_content, const char *input_file) {
     fwrite(&input_size, sizeof(size_t), 1, out_file);
     printf("input_size: %zu\n", input_size);
 
-    fwrite(encoder_state.prob_table, sizeof(int), 256, out_file); 
-    fwrite(encoder_state.cumul_table, sizeof(int), 257, out_file); 
-    fwrite(&encoder_state.frac_size, sizeof(int), 1, out_file);
-    fwrite(&encoder_state.one_counter, sizeof(int), 1, out_file);
-    fwrite(&encoder_state.current_index, sizeof(int), 1, out_file);
-    fwrite(&encoder_state.out_index, sizeof(int), 1, out_file);
-    fwrite(&encoder_state.last_symbol, sizeof(int), 1, out_file);
-    fwrite(&encoder_state.current_symbol, sizeof(unsigned char), 1, out_file);
+    //fwrite(encoder_state.prob_table, sizeof(int), 256, out_file); 
+    fwrite(encoder_state.cumul_table, sizeof(int), 128, out_file); 
+    //fwrite(&encoder_state.frac_size, sizeof(int), 1, out_file);
+    //fwrite(&encoder_state.one_counter, sizeof(int), 1, out_file);
+    //fwrite(&encoder_state.current_index, sizeof(int), 1, out_file);
+    //fwrite(&encoder_state.out_index, sizeof(int), 1, out_file);
+    //fwrite(&encoder_state.last_symbol, sizeof(int), 1, out_file);
+    //fwrite(&encoder_state.current_symbol, sizeof(unsigned char), 1, out_file);
     fwrite(&encoder_state.base, sizeof(int), 1, out_file);
-    fwrite(&encoder_state.length, sizeof(int), 1, out_file);
+    //fwrite(&encoder_state.length, sizeof(int), 1, out_file);
 
-    fwrite(output, sizeof(unsigned char), output_size, out_file);
+    fwrite(output, sizeof(unsigned char), actual_output_size, out_file);
 
     printf("output cotent: %s\n", output);
     printf("output_size: %zu\n", actual_output_size);
@@ -477,20 +477,20 @@ void arithmetic_decompress(const char *input_file) {
     fread(&input_size, sizeof(size_t), 1, in_file);
 
 
-    encoder_state.prob_table = malloc(sizeof(int) * 256); 
-    encoder_state.cumul_table = malloc(sizeof(int) * 257); 
+    encoder_state.prob_table = malloc(sizeof(int) * 128); 
+    encoder_state.cumul_table = malloc(sizeof(int) * 128); 
 
 
-    fread(encoder_state.prob_table, sizeof(int), 256, in_file);
-    fread(encoder_state.cumul_table, sizeof(int), 257, in_file);
-    fread(&encoder_state.frac_size, sizeof(int), 1, in_file);
-    fread(&encoder_state.one_counter, sizeof(int), 1, in_file);
-    fread(&encoder_state.current_index, sizeof(int), 1, in_file);
-    fread(&encoder_state.out_index, sizeof(int), 1, in_file);
-    fread(&encoder_state.last_symbol, sizeof(int), 1, in_file);
-    fread(&encoder_state.current_symbol, sizeof(unsigned char), 1, in_file);
+    //fread(encoder_state.prob_table, sizeof(int), 256, in_file);
+    fread(encoder_state.cumul_table, sizeof(int),128, in_file);
+    //fread(&encoder_state.frac_size, sizeof(int), 1, in_file);
+    //fread(&encoder_state.one_counter, sizeof(int), 1, in_file);
+    //fread(&encoder_state.current_index, sizeof(int), 1, in_file);
+    //fread(&encoder_state.out_index, sizeof(int), 1, in_file);
+    //fread(&encoder_state.last_symbol, sizeof(int), 1, in_file);
+    //fread(&encoder_state.current_symbol, sizeof(unsigned char), 1, in_file);
     fread(&encoder_state.base, sizeof(int), 1, in_file);
-    fread(&encoder_state.length, sizeof(int), 1, in_file);
+    //fread(&encoder_state.length, sizeof(int), 1, in_file);
 
     size_t output_size = input_size*2; 
     unsigned char* output = calloc(sizeof(unsigned char) * output_size,1);

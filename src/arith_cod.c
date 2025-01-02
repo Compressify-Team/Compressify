@@ -8,8 +8,8 @@
 
 void init_state(ac_state_t* state, int precision) 
 {
-    state->prob_table = calloc(sizeof(int) * 256,1);
-    state->cumul_table = calloc(sizeof(int) * 257,1);
+    state->prob_table = calloc(sizeof(int) * 128,1);
+    state->cumul_table = calloc(sizeof(int) * 128,1);
 
     state->frac_size = precision;
 
@@ -32,7 +32,7 @@ void transform_count_to_cumul(ac_state_t* state, int _)
     (void)_; // unused
     int i;
     int size = 0;
-    int alphabet_size = 256;
+    int alphabet_size = 128;
     for (i = 0; i < alphabet_size; ++i) size += state->prob_table[i];
 
     for (i = 0; i < alphabet_size; ++i) {
@@ -45,12 +45,12 @@ void transform_count_to_cumul(ac_state_t* state, int _)
         }
             state->cumul_table[i+1] = state->cumul_table[i] + local_prob;
     }
-    state->cumul_table[256] = ((long long) 1 << state->frac_size) - 1;
+    state->cumul_table[128] = ((long long) 1 << state->frac_size) - 1;
 }
 
 void build_probability_table(ac_state_t* state, const unsigned char* in, int size) 
 {
-    int alphabet_size = 256;
+    int alphabet_size = 128;
     int count_weight = 1;
     int i;
     // reset 
@@ -66,13 +66,13 @@ void build_probability_table(ac_state_t* state, const unsigned char* in, int siz
 
 void reset_uniform_probability(ac_state_t* state)
 {
-    int alphabet_size = 256;
+    int alphabet_size = 128;
     int size = 0;
     int i;
 
-    for (i = 0; i < 256; ++i) state->prob_table[i] = 1;
+    for (i = 0; i < 128; ++i) state->prob_table[i] = 1;
 
-    for (i = 0; i < 256; ++i) {
+    for (i = 0; i < 128; ++i) {
         int count = state->prob_table[i];
         state->prob_table[i] = ((long long) count * (1 << state->frac_size)) / (size + alphabet_size);
         if (i == 0) {
@@ -86,17 +86,17 @@ void reset_uniform_probability(ac_state_t* state)
 void reset_prob_table(ac_state_t* state)
 {
     int i;
-    for (i = 0; i < 256; ++i) state->prob_table[i] = 1;
+    for (i = 0; i < 128; ++i) state->prob_table[i] = 1;
 }
 
 void display_prob_table(ac_state_t* state) 
 {
     int i;
     double norm = (double) ((1 << state->frac_size));
-    for (i = 0; i < 256; i++) {
+    for (i = 0; i < 128; i++) {
         printf("P[%i]=%.6f, C[%i/%x]=%.6f / %x\n", i, state->prob_table[i] / norm, i, i, state->cumul_table[i] / norm, state->cumul_table[i]); 
     }
-    i = 256;
+    i = 128;
     printf("P[%i]=%.6f, C[%i/%02x]=%.6f / %x\n", i, 0.0, i, i, state->cumul_table[i] / norm, state->cumul_table[i]); 
 }
 
@@ -232,8 +232,8 @@ unsigned char decode_character( unsigned char* in, ac_state_t* state)
 
     // interval selection
     //printf("test1");
-    int s = 0, n = 256, X = 0;
-    long long Y= ((long long) length * state->cumul_table[256]) >> state->frac_size;
+    int s = 0, n = 128, X = 0;
+    long long Y= ((long long) length * state->cumul_table[128]) >> state->frac_size;
     // 使用 Y 進行後續操作
     //printf("cumul %d",state->cumul_table[256]);
     //printf("Y: %lld\n", Y);
@@ -341,7 +341,7 @@ void encode_value_with_update(unsigned char* out, unsigned char* in, size_t size
     int update_count = 0;
     int k;
     // reseting count
-    for (size_t i = 0; i < 256; i++){
+    for (size_t i = 0; i < 128; i++){
         state->prob_table[k] = 1;
         k++;
     }
@@ -364,7 +364,7 @@ void encode_value_with_update(unsigned char* out, unsigned char* in, size_t size
             if (range_clear) {
                 update_count = 0;
                 int j;
-                for (j = 0; j < 256; j++) state->prob_table[j] = 1;
+                for (j = 0; j < 128; j++) state->prob_table[j] = 1;
             }
         }
     }
@@ -399,7 +399,7 @@ void decode_value_with_update(unsigned char* out, unsigned char* in, ac_state_t*
     // reseting count
     
     int temp=0;
-    for (size_t i = 0; i < 256; i++){
+    for (size_t i = 0; i < 128; i++){
         state->prob_table[temp] = 1;
         temp++;
     }
@@ -425,7 +425,7 @@ void decode_value_with_update(unsigned char* out, unsigned char* in, ac_state_t*
             if (range_clear) {
                 update_count = 0;
                 int j;
-                for (j = 0; j < 256; j++) state->prob_table[j] = 1;
+                for (j = 0; j < 128; j++) state->prob_table[j] = 1;
             };
         }
 
