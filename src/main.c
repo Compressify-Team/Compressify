@@ -4,7 +4,11 @@
 #include <assert.h>
 #include <unistd.h>
 #include "arith_cod.h"
-
+#include <sndfile.h>
+#include <fftw3.h>
+#include <time.h>
+#include <sys/resource.h>
+#include <sys/time.h>
 #define MAX_CHAR 256
 
 typedef struct Node {
@@ -248,7 +252,7 @@ void decompress_huffman(const char *input_file) {
                 root_node = peek_node->rchild;
             } else {
                 //printf("Freeing node: %c\n", peek_node->val); // Debug: Output node being freed
-                free(peek_node);
+                //free(peek_node);
                 last_visited = peek_node;
                 stack_size--;
             }
@@ -354,7 +358,7 @@ int huffman_compress(const char *file_content, const char *input_file) {
                 root = peek_node->rchild;
             } 
             else {
-                free(peek_node);
+                //free(peek_node);
                 last_visited = peek_node;
                 stack_size--;
             }
@@ -555,118 +559,471 @@ void arithmetic_decompress(const char *input_file) {
 
 //-------------------------------------------arithmetic coding end-------------------------------------------
 
+//-------------------------------------------Audio Compression-------------------------------------------
 
-// Function to display input prompt
-void show_prompt()
-{
-    printf("Please enter the decompression/compression algorithm and input file:\n");
-    printf("Algorithms can be used: huffman, arithmetic\n");
-    printf("Usage: -c/-d [algorithm] [input_file]\n");
+
+void print_progress(double percentage) {
+    int barWidth = 70;
+    printf("[");
+    int pos = barWidth * percentage;
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < pos) printf("=");
+        else if (i == pos) printf(">");
+        else printf(" ");
+    }
+    printf("] %d %%\r", (int)(percentage * 100.0));
+    fflush(stdout);
 }
 
+void compress_audio(const char *input_file, const char *output_file) {
+    // Open input file
+    SF_INFO sfinfo;
+    SNDFILE *infile = sf_open(input_file, SFM_READ, &sfinfo);
+    if (!infile) {
+        printf("Failed to open input file\n");
+        return;
+    }
 
-// Main function
-int main() 
-{
-    while (1)
-    {
-        char com_or_decom[100];
-        char algorithm[100];
-        char input_file[100];
-        // Display input prompt
-        show_prompt();
+    // Read audio data
+    int num_samples = sfinfo.frames * sfinfo.channels;
+    double *buffer = (double *)malloc(num_samples * sizeof(double));
+    sf_read_double(infile, buffer, num_samples);
 
-        // Read user input
-        if (scanf("%99s %99s %99s", com_or_decom, algorithm, input_file) != 3) {
-            return 1;
-        }
+    // Perform FFT
+    fftw_complex *out = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * num_samples);
+    fftw_plan p = fftw_plan_dft_r2c_1d(num_samples, buffer, out, FFTW_ESTIMATE);
+    fftw_execute(p);
+
+    // Write compressed data to output file
+    FILE *outfile = fopen(output_file, "wb");
+    fwrite(&sfinfo, sizeof(SF_INFO), 1, outfile); // Write SF_INFO to output file
+    fwrite(out, sizeof(fftw_complex), num_samples, outfile);
+
+    // Calculate compression ratio
+    long original_size = num_samples * sizeof(double);
+    long compressed_size = sizeof(SF_INFO) + num_samples * sizeof(fftw_complex);
+    double compression_ratio = (double)compressed_size / original_size * 100.0;
+    printf("\nOriginal size: %ld bytes\n", original_size);
+    printf("Compressed size: %ld bytes\n", compressed_size);
+    printf("Compression ratio: %.2f%%\n", compression_ratio);
+
+    // Clean up
+    fclose(outfile);
+    fftw_destroy_plan(p);
+    fftw_free(out);
+    sf_close(infile);
+    free(buffer);
+}
+
+void decompress_audio(const char *input_file, const char *output_file) {
+    // Open input file
+    FILE *infile = fopen(input_file, "rb");
+    if (!infile) {
+        printf("Failed to open input file\n");
+        return;
+    }
+
+    // Read SF_INFO from input file
+    SF_INFO sfinfo;
+    fread(&sfinfo, sizeof(SF_INFO), 1, infile);
+
+    // Read compressed data
+    fseek(infile, 0, SEEK_END);
+    long file_size = ftell(infile) - sizeof(SF_INFO);
+    fseek(infile, sizeof(SF_INFO), SEEK_SET);
+    fftw_complex *buffer = (fftw_complex *)fftw_malloc(file_size);
+    fread(buffer, 1, file_size, infile);
+
+    // Perform inverse FFT
+    int num_samples = file_size / sizeof(fftw_complex);
+    double *out = (double *)malloc(num_samples * sizeof(double));
+    fftw_plan p = fftw_plan_dft_c2r_1d(num_samples, buffer, out, FFTW_ESTIMATE);
+    fftw_execute(p);
+
+    // Normalize the output from IFFT
+    for (int i = 0; i < num_samples; i++) {
+        out[i] /= num_samples;
+    }
+
+    // Write decompressed data to output file
+    SNDFILE *outfile = sf_open(output_file, SFM_WRITE, &sfinfo);
+    sf_write_double(outfile, out, num_samples);
+
+    // Calculate decompressed size
+    long decompressed_size = num_samples * sizeof(double);
+    double decompression_ratio = (double)decompressed_size / file_size * 100.0;
+    printf("\nDecompressed size: %ld bytes\n", decompressed_size);
+    printf("Decompression ratio: %.2f%%\n", decompression_ratio);
+
+    // Clean up
+    sf_close(outfile);
+    fftw_destroy_plan(p);
+    fftw_free(buffer);
+    fclose(infile);
+    free(out);
+}
+
+// void clear_input_buffer() {
+//     int c;
+//     while ((c = getchar()) != '\n' && c != EOF);
+// }
 
 
-        if (strcmp(com_or_decom,"-c"))
-        {
-            printf("Compress or Decompress: compress\n");
-        }
-        else if (strcmp(com_or_decom,"-d"))
-        {
-            printf("Compress or Decompress: decompress\n");
-        }
-        else
-        {
-            printf("Error: Unknown operation '%s'. Use -c for compression or -d for decompression.\n", com_or_decom);
-            return 1;
-        }
-        printf("Algorithm: %s\n", algorithm);
-        printf("Input file: %s\n", input_file);
+//-------------------------------------------Audio Compression end-------------------------------------------
+// Function to display input prompt
+void show_main_menu() {
+    printf("Please select an option:\n");
+    printf("1. Compress\n");
+    printf("2. Decompress\n");
+    printf("3. Exit\n");
+}
 
+void show_compress_menu() {
+    printf("Please select a compression algorithm:\n");
+    printf("1. Huffman\n");
+    printf("2. Arithmetic\n");
+    printf("3. Audio\n");
+    printf("4. Back to main menu\n");
+}
 
-
-        // Open the input file for reading
-        FILE *file = fopen(input_file, "rb");
-        if (file == NULL) {
-            perror("Error opening input file");
-            return 1;
-        }
-
-        // Determine the file size
-        fseek(file, 0, SEEK_END);
-        size_t file_size = ftell(file);
-        rewind(file);
-
-        // Allocate memory to hold the file content
-        char *file_content = (char *)calloc(file_size, 1);
-        if (file_content == NULL) {
-            perror("Memory allocation failed");
-            fclose(file);
-            return 1;
-        }
-
-        // Read the file content
-        fread(file_content, 1, file_size, file);
+void show_decompress_menu() {
+    printf("Please select a decompression algorithm:\n");
+    printf("1. Huffman\n");
+    printf("2. Arithmetic\n");
+    printf("3. Audio\n");
+    printf("4. Back to main menu\n");
+}
+// void show_prompt()
+// {
+//     printf("Please enter the decompression/compression algorithm and input file or output file if :\n");
+//     printf("Algorithms can be used: huffman, arithmetic or audio \n");
+//     printf("Usage: -c/-d [algorithm] \n");
+// }
+char com_or_decom[100];
+char algorithm[100];
+typedef struct {
+    char *file_content;
+    size_t file_size;
+} FileData;
+FileData fileOpen(const char *input_file) {
+    FileData file_data = {NULL, 0};
+    printf("Input file: %s\n", input_file);
+    FILE *file = fopen(input_file, "rb");
+    if (file == NULL) {
+        perror("Error opening input file");
+        return file_data;
+    }
+    fseek(file, 0, SEEK_END);
+    file_data.file_size = ftell(file);
+    rewind(file);
+    file_data.file_content = (char *)calloc(file_data.file_size, 1);
+    if (file_data.file_content == NULL) {
+        perror("Memory allocation failed");
         fclose(file);
+        return file_data;
+    }
+    fread(file_data.file_content, 1, file_data.file_size, file);
+    fclose(file);
+    return file_data;
+}
+// Main function
+int main() {
+    int main_choice, sub_choice;
+    while (1) {
+        // Display main menu
+        show_main_menu();
+        printf("Enter your choice: ");
+        scanf("%d", &main_choice);
 
-        // Select the appropriate action based on user input
-        if (strcmp(com_or_decom, "-c") == 0) {
-            // Compression
-            if (strcmp(algorithm, "huffman") == 0) {
-                int compressed_size = huffman_compress(file_content, input_file);
-                if(compressed_size != 0){
-                    printf("Compressed file size: %d bytes\n", compressed_size);
-                    double compression_ratio = (double)compressed_size / (double)file_size;
-                    printf("Compression ratio: %.2f\n", compression_ratio);
+        if (main_choice == 3) {
+            printf("Exiting the program.\n");
+            break;
+        }
+
+        if (main_choice == 1) {
+            // Compression menu
+            while (1) {
+                show_compress_menu();
+                printf("Enter your choice: ");
+                scanf("%d", &sub_choice);
+
+                if (sub_choice == 4) {
+                    break;
                 }
-            } else if (strcmp(algorithm, "arithmetic") == 0) {
-                arithmetic_compress(file_content, input_file);
-            } else {
-                printf("Error: Unknown algorithm '%s'.\n", algorithm);
-                free(file_content);
-                return 1;
+
+                char input_file[256], output_file[256];
+                printf("請輸入輸入檔案名稱: ");
+                scanf("%s", input_file);
+
+                if (sub_choice == 1) {
+                    FileData file_data = fileOpen(input_file);
+                    if (file_data.file_content == NULL) {
+                        return 1;
+                    }
+                    int compressed_size = huffman_compress(file_data.file_content, input_file);
+                    if (compressed_size != 0) {
+                        printf("Compressed file size: %d bytes\n", compressed_size);
+                        double compression_ratio = (double)compressed_size / (double)file_data.file_size;
+                        printf("Compression ratio: %.2f\n", compression_ratio);
+                    }
+                    free(file_data.file_content);
+                } else if (sub_choice == 2) {
+                    FileData file_data = fileOpen(input_file);
+                    if (file_data.file_content == NULL) {
+                        return 1;
+                    }
+                    arithmetic_compress(file_data.file_content, input_file);
+                    free(file_data.file_content);
+                } else if (sub_choice == 3) {
+                    printf("請輸入輸出檔案名稱: ");
+                    scanf("%s", output_file);
+                    compress_audio(input_file, output_file);
+                } else {
+                    printf("Invalid choice. Please try again.\n");
+                }
             }
-        } else if (strcmp(com_or_decom, "-d") == 0) {
-            // Decompression
-            if (strcmp(algorithm, "huffman") == 0) {
-                printf("Decompressing %s using Huffman Coding...\n", input_file);
-                decompress_huffman(input_file);
-                
-            } else if (strcmp(algorithm, "arithmetic") == 0) {
-                arithmetic_decompress(input_file);
-            } else {
-                printf("Error: Unknown algorithm '%s'.\n", algorithm);
-                free(file_content);
-                return 1;
+        } else if (main_choice == 2) {
+            // Decompression menu
+            while (1) {
+                show_decompress_menu();
+                printf("Enter your choice: ");
+                scanf("%d", &sub_choice);
+
+                if (sub_choice == 4) {
+                    break;
+                }
+
+                char input_file[256], output_file[256];
+                printf("請輸入輸入檔案名稱: ");
+                scanf("%s", input_file);
+
+                if (sub_choice == 1) {
+                    printf("Decompressing %s using Huffman Coding...\n", input_file);
+                    decompress_huffman(input_file);
+                } else if (sub_choice == 2) {
+                    arithmetic_decompress(input_file);
+                } else if (sub_choice == 3) {
+                    printf("請輸入輸出檔案名稱: ");
+                    scanf("%s", output_file);
+                    decompress_audio(input_file, output_file);
+                } else {
+                    printf("Invalid choice. Please try again.\n");
+                }
             }
         } else {
-            printf("Error: Unknown operation '%s'. Use -c for compression or -d for decompression.\n", com_or_decom);
-            free(file_content);
-            return 1;
+            printf("Invalid choice. Please try again.\n");
         }
-
-        // Free allocated memory
-        free(file_content);
-        printf("\n\n\n");
-
     }
-    
     return 0;
 }
+// Main function
+// int main() {
+//     while (1) {
+//         // Display input prompt
+//         show_prompt();
+//         struct rusage usage;
+//         struct timeval start, end;
+//         gettimeofday(&start, NULL);
 
+//         // Read user input
+//         if (scanf("%99s %99s", com_or_decom, algorithm) != 2) {
+//             return 1;
+//         }
+
+//         if (strcmp(com_or_decom, "-c") == 0) {
+//             printf("Compress or Decompress: compress\n");
+//         } else if (strcmp(com_or_decom, "-d") == 0) {
+//             printf("Compress or Decompress: decompress\n");
+//         } else {
+//             printf("Error: Unknown operation '%s'. Use -c for compression or -d for decompression.\n", com_or_decom);
+//             return 1;
+//         }
+//         printf("Algorithm: %s\n", algorithm);
+
+//         // Select the appropriate action based on user input
+//         if (strcmp(com_or_decom, "-c") == 0) {
+//             // Compression
+//             if (strcmp(algorithm, "huffman") == 0) {
+//                 char input_file[100];
+//                 printf("請輸入輸入檔案名稱: ");
+//                 scanf("%s", input_file);
+//                 FileData file_data = fileOpen(input_file);
+//                 if (file_data.file_content == NULL) {
+//                     return 1;
+//                 }
+//                 int compressed_size = huffman_compress(file_data.file_content, input_file);
+//                 if (compressed_size != 0) {
+//                     printf("Compressed file size: %d bytes\n", compressed_size);
+//                     double compression_ratio = (double)compressed_size / (double)file_data.file_size;
+//                     printf("Compression ratio: %.2f\n", compression_ratio);
+//                 }
+//                 free(file_data.file_content);
+//             } else if (strcmp(algorithm, "arithmetic") == 0) {
+//                 char input_file[100];
+//                 printf("請輸入輸入檔案名稱: ");
+//                 scanf("%s", input_file);
+//                 FileData file_data = fileOpen(input_file);
+//                 if (file_data.file_content == NULL) {
+//                     return 1;
+//                 }
+//                 arithmetic_compress(file_data.file_content, input_file);
+//                 free(file_data.file_content);
+//             } else if (strcmp(algorithm, "audio") == 0) {
+//                 char input_file[256], output_file[256];
+//                 printf("請輸入輸入檔案名稱: ");
+//                 scanf("%s", input_file);
+//                 printf("請輸入輸出檔案名稱: ");
+//                 scanf("%s", output_file);
+//                 compress_audio(input_file, output_file);
+//                 gettimeofday(&end, NULL);
+//                 getrusage(RUSAGE_SELF, &usage);
+//                 double elapsed_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
+//                 printf("Elapsed time: %.2f seconds\n", elapsed_time);
+//                 printf("Memory usage: %ld kilobytes\n", usage.ru_maxrss);
+//             } else {
+//                 printf("Error: Unknown algorithm '%s'.\n", algorithm);
+//                 return 1;
+//             }
+//         } else if (strcmp(com_or_decom, "-d") == 0) {
+//             // Decompression
+//             if (strcmp(algorithm, "huffman") == 0) {
+//                 char input_file[100];
+//                 printf("請輸入輸入檔案名稱: ");
+//                 scanf("%s", input_file);
+//                 printf("Decompressing %s using Huffman Coding...\n", input_file);
+//                 decompress_huffman(input_file);
+//             } else if (strcmp(algorithm, "arithmetic") == 0) {
+//                 char input_file[100];
+//                 printf("請輸入輸入檔案名稱: ");
+//                 scanf("%s", input_file);
+//                 arithmetic_decompress(input_file);
+//             } else if (strcmp(algorithm, "audio") == 0) {
+//                 char input_file[256], output_file[256];
+//                 printf("請輸入輸入檔案名稱: ");
+//                 scanf("%s", input_file);
+//                 printf("請輸入輸出檔案名稱: ");
+//                 scanf("%s", output_file);
+//                 decompress_audio(input_file, output_file);
+//                 gettimeofday(&end, NULL);
+//                 getrusage(RUSAGE_SELF, &usage);
+//                 double elapsed_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
+//                 printf("Elapsed time: %.2f seconds\n", elapsed_time);
+//                 printf("Memory usage: %ld kilobytes\n", usage.ru_maxrss);
+//             } else {
+//                 printf("Error: Unknown algorithm '%s'.\n", algorithm);
+//                 return 1;
+//             }
+//         } else {
+//             printf("Error: Unknown operation '%s'. Use -c for compression or -d for decompression.\n", com_or_decom);
+//             return 1;
+//         }
+
+//         printf("\n\n\n");
+//     }
+//     return 0;
+// }
+//---------------------------------------------------------------------------------
+// Main function
+
+// int main() 
+// {
+//     while (1)
+//     {
+//         // Display input prompt
+//         show_prompt();
+//         struct rusage usage;
+//         struct timeval start, end;
+//         gettimeofday(&start, NULL);
+
+//         // Read user input
+//         if (scanf("%99s %99s ", com_or_decom, algorithm) != 2) {
+//             return 1;
+//         }
+//         if (strcmp(com_or_decom,"-c"))
+//         {
+//             printf("Compress or Decompress: compress\n");
+//         }
+//         else if (strcmp(com_or_decom,"-d"))
+//         {
+//             printf("Compress or Decompress: decompress\n");
+//         }
+//         else
+//         {
+//             printf("Error: Unknown operation '%s'. Use -c for compression or -d for decompression.\n", com_or_decom);
+//             return 1;
+//         }
+//         printf("Algorithm: %s\n", algorithm);
+
+        
+
+//         // Select the appropriate action based on user input
+//         if (strcmp(com_or_decom, "-c") == 0) {
+//             // Compression
+//             if (strcmp(algorithm, "huffman") == 0) {
+//                 fileOpen();
+//                 int compressed_size = huffman_compress(file_content, input_file);
+//                 if(compressed_size != 0){
+//                     printf("Compressed file size: %d bytes\n", compressed_size);
+//                     double compression_ratio = (double)compressed_size / (double)file_size;
+//                     printf("Compression ratio: %.2f\n", compression_ratio);
+//                 }
+//             } else if (strcmp(algorithm, "arithmetic") == 0) {
+//                 fileOpen();
+//                 arithmetic_compress(file_content, input_file);
+//             } else if (strcmp(algorithm, "audio") == 0) {
+//                 char input_file[256], output_file[256];
+//                 printf("請輸入輸入檔案名稱: ");
+//                 scanf("%s", input_file);
+//                 printf("請輸入輸出檔案名稱: ");
+//                 scanf("%s", output_file);
+//                 compress_audio(input_file, output_file);
+//                 gettimeofday(&end, NULL);
+//                 getrusage(RUSAGE_SELF, &usage);
+//                 double elapsed_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
+//                 printf("Elapsed time: %.2f seconds\n", elapsed_time);
+//                 printf("Memory usage: %ld kilobytes\n", usage.ru_maxrss);
+//             } else {
+//                 printf("Error: Unknown algorithm '%s'.\n", algorithm);
+//                 free(file_content);
+//                 return 1;
+//             }
+//         } else if (strcmp(com_or_decom, "-d") == 0) {
+//             // Decompression
+//             if (strcmp(algorithm, "huffman") == 0) {
+//                 printf("Decompressing %s using Huffman Coding...\n", input_file);
+//                 decompress_huffman(input_file);
+                
+//             } else if (strcmp(algorithm, "arithmetic") == 0) {
+//                 arithmetic_decompress(input_file);
+//             } else if (strcmp(algorithm, "audio") == 0) {
+//                 char input_file[256], output_file[256];
+//                 printf("請輸入輸入檔案名稱: ");
+//                 scanf("%s", input_file);
+//                 printf("請輸入輸出檔案名稱: ");
+//                 scanf("%s", output_file);
+//                 decompress_audio(input_file, output_file);
+//                 gettimeofday(&end, NULL);
+//                 getrusage(RUSAGE_SELF, &usage);
+//                 double elapsed_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
+//                 printf("Elapsed time: %.2f seconds\n", elapsed_time);
+//                 printf("Memory usage: %ld kilobytes\n", usage.ru_maxrss);
+//             } else {
+//                 printf("Error: Unknown algorithm '%s'.\n", algorithm);
+//                 free(file_content);
+//                 return 1;
+//             }
+//         } else {
+//             printf("Error: Unknown operation '%s'. Use -c for compression or -d for decompression.\n", com_or_decom);
+//             free(file_content);
+//             return 1;
+//         }
+
+//         // Free allocated memory
+//         free(file_content);
+//         printf("\n\n\n");
+
+//     }
+//     return 0;
+// }
+// todo list  1.把audio的壓縮解壓縮加進去 2.改一下make file讓audio compression時不用再多新增-lsndfile -lfftw3這樣子的指令 3.把main的部分改一下
 
