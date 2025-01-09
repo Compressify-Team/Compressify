@@ -688,8 +688,6 @@ int main()
     {
         char com_or_decom[100];
         char algorithm[100];
-        char input_file[100];
-        char output_file[100];
         // Display input prompt
         show_prompt();
         struct rusage usage;
@@ -697,7 +695,7 @@ int main()
         gettimeofday(&start, NULL);
 
         // Read user input
-        if (scanf("%99s %99s %99s", com_or_decom, algorithm, input_file) != 3) {
+        if (scanf("%99s %99s ", com_or_decom, algorithm) != 2) {
             return 1;
         }
 
@@ -716,38 +714,33 @@ int main()
             return 1;
         }
         printf("Algorithm: %s\n", algorithm);
-        printf("Input file: %s\n", input_file);
 
-
-
-        // Open the input file for reading
-        FILE *file = fopen(input_file, "rb");
-        if (file == NULL) {
-            perror("Error opening input file");
-            return 1;
-        }
-
-        // Determine the file size
-        fseek(file, 0, SEEK_END);
-        size_t file_size = ftell(file);
-        rewind(file);
-
-        // Allocate memory to hold the file content
-        char *file_content = (char *)calloc(file_size, 1);
-        if (file_content == NULL) {
-            perror("Memory allocation failed");
+        void fileOpen (){
+            char input_file[100];
+            printf("Input file: %s\n", input_file);
+            FILE *file = fopen(input_file, "rb");
+            if (file == NULL) {
+                perror("Error opening input file");
+                return 1;
+            }
+            fseek(file, 0, SEEK_END);
+            size_t file_size = ftell(file);
+            rewind(file);
+            char *file_content = (char *)calloc(file_size, 1);
+            if (file_content == NULL) {
+                perror("Memory allocation failed");
+                fclose(file);
+                return 1;
+            }
+            fread(file_content, 1, file_size, file);
             fclose(file);
-            return 1;
         }
-
-        // Read the file content
-        fread(file_content, 1, file_size, file);
-        fclose(file);
 
         // Select the appropriate action based on user input
         if (strcmp(com_or_decom, "-c") == 0) {
             // Compression
             if (strcmp(algorithm, "huffman") == 0) {
+                fileOpen();
                 int compressed_size = huffman_compress(file_content, input_file);
                 if(compressed_size != 0){
                     printf("Compressed file size: %d bytes\n", compressed_size);
@@ -755,6 +748,7 @@ int main()
                     printf("Compression ratio: %.2f\n", compression_ratio);
                 }
             } else if (strcmp(algorithm, "arithmetic") == 0) {
+                fileOpen();
                 arithmetic_compress(file_content, input_file);
             } else if (strcmp(algorithm, "audio") == 0) {
                 char input_file[256], output_file[256];
@@ -790,7 +784,6 @@ int main()
                 decompress_audio(input_file, output_file);
                 gettimeofday(&end, NULL);
                 getrusage(RUSAGE_SELF, &usage);
-
                 double elapsed_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
                 printf("Elapsed time: %.2f seconds\n", elapsed_time);
                 printf("Memory usage: %ld kilobytes\n", usage.ru_maxrss);
@@ -812,5 +805,5 @@ int main()
     }
     return 0;
 }
-
+// todo list  1.把audio的壓縮解壓縮加進去 2.改一下make file讓audio compression時不用再多新增-lsndfile -lfftw3這樣子的指令 4.把main的部分改一下
 
