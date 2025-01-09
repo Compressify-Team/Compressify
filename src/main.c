@@ -673,12 +673,31 @@ void decompress_audio(const char *input_file, const char *output_file) {
 // Function to display input prompt
 void show_prompt()
 {
-    printf("Please enter the decompression/compression algorithm and input file or output file if required:\n");
+    printf("Please enter the decompression/compression algorithm and input file or output file if :\n");
     printf("Algorithms can be used: huffman, arithmetic or audio \n");
     printf("Usage: -c/-d [algorithm] [input_file]\n");
 }
 
-
+void fileOpen (){
+            char input_file[100];
+            printf("Input file: %s\n", input_file);
+            FILE *file = fopen(input_file, "rb");
+            if (file == NULL) {
+                perror("Error opening input file");
+                return 1;
+            }
+            fseek(file, 0, SEEK_END);
+            size_t file_size = ftell(file);
+            rewind(file);
+            char *file_content = (char *)calloc(file_size, 1);
+            if (file_content == NULL) {
+                perror("Memory allocation failed");
+                fclose(file);
+                return 1;
+            }
+            fread(file_content, 1, file_size, file);
+            fclose(file);
+        }
 
 // Main function
 
@@ -715,26 +734,7 @@ int main()
         }
         printf("Algorithm: %s\n", algorithm);
 
-        void fileOpen (){
-            char input_file[100];
-            printf("Input file: %s\n", input_file);
-            FILE *file = fopen(input_file, "rb");
-            if (file == NULL) {
-                perror("Error opening input file");
-                return 1;
-            }
-            fseek(file, 0, SEEK_END);
-            size_t file_size = ftell(file);
-            rewind(file);
-            char *file_content = (char *)calloc(file_size, 1);
-            if (file_content == NULL) {
-                perror("Memory allocation failed");
-                fclose(file);
-                return 1;
-            }
-            fread(file_content, 1, file_size, file);
-            fclose(file);
-        }
+        
 
         // Select the appropriate action based on user input
         if (strcmp(com_or_decom, "-c") == 0) {
