@@ -673,8 +673,8 @@ void decompress_audio(const char *input_file, const char *output_file) {
 // Function to display input prompt
 void show_prompt()
 {
-    printf("Please enter the decompression/compression algorithm and input file:\n");
-    printf("Algorithms can be used: huffman, arithmetic\n");
+    printf("Please enter the decompression/compression algorithm and input file or output file if required:\n");
+    printf("Algorithms can be used: huffman, arithmetic or audio \n");
     printf("Usage: -c/-d [algorithm] [input_file]\n");
 }
 
