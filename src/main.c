@@ -1027,3 +1027,4 @@ int main() {
 // }
 // todo list  1.把audio的壓縮解壓縮加進去 2.改一下make file讓audio compression時不用再多新增-lsndfile -lfftw3這樣子的指令 3.把main的部分改一下
 
+//new version
