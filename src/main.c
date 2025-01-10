@@ -394,7 +394,7 @@ size_t calculate_output_size(const unsigned char *output, size_t max_size) {
     return size;
 }
 
-void arithmetic_compress(const char *file_content, const char *input_file) {
+int arithmetic_compress(const char *file_content, const char *input_file) {
     size_t input_size = strlen(file_content);
 
     size_t output_size = input_size * 2; // 預估大小
@@ -421,7 +421,7 @@ void arithmetic_compress(const char *file_content, const char *input_file) {
     if (out_file == NULL) {
         perror("Error opening output file");
         free(output);
-        return;
+        return 0;
     }
     
 
@@ -443,8 +443,8 @@ void arithmetic_compress(const char *file_content, const char *input_file) {
 
     fwrite(output, sizeof(unsigned char), actual_output_size, out_file);
 
-    printf("output cotent: %s\n", output);
-    printf("output_size: %zu\n", actual_output_size);
+    //printf("output cotent: %s\n", output);
+    //printf("output_size: %zu\n", actual_output_size);
     /*
     //print all encoder_state
     printf("ac_state_t:\n");
@@ -457,8 +457,14 @@ void arithmetic_compress(const char *file_content, const char *input_file) {
     printf("  base: %d\n", encoder_state.base);
     printf("  length: %d\n", encoder_state.length);
 */
+
+    //calculate the size of the compressed file
+    fseek(out_file, 0, SEEK_END);
+    size_t compressed_size = ftell(out_file);
     fclose(out_file);
     free(output);
+    return compressed_size;
+
 
 }
 
@@ -683,7 +689,8 @@ void show_compress_menu() {
     printf("1. Huffman\n");
     printf("2. Arithmetic\n");
     printf("3. Audio\n");
-    printf("4. Back to main menu\n");
+    printf("4. Auto\n");
+    printf("5. Back to main menu\n");
 }
 
 void show_decompress_menu() {
@@ -691,7 +698,8 @@ void show_decompress_menu() {
     printf("1. Huffman\n");
     printf("2. Arithmetic\n");
     printf("3. Audio\n");
-    printf("4. Back to main menu\n");
+    printf("4. Auto\n");
+    printf("5. Back to main menu\n");
 }
 // void show_prompt()
 // {
@@ -747,7 +755,7 @@ int main() {
                 printf("Enter your choice: ");
                 scanf("%d", &sub_choice);
 
-                if (sub_choice == 4) {
+                if (sub_choice == 5) {
                     break;
                 }
 
@@ -772,16 +780,106 @@ int main() {
                     if (file_data.file_content == NULL) {
                         return 1;
                     }
-                    arithmetic_compress(file_data.file_content, input_file);
+                    int compressed_size = arithmetic_compress(file_data.file_content, input_file);
+                    if (compressed_size != 0) {
+                        printf("Compressed file size: %d bytes\n", compressed_size);
+                        double compression_ratio = (double)compressed_size / (double)file_data.file_size;
+                        printf("Compression ratio: %.2f\n", compression_ratio);
+                    }
                     free(file_data.file_content);
                 } else if (sub_choice == 3) {
                     printf("請輸入輸出檔案名稱: ");
                     scanf("%s", output_file);
                     compress_audio(input_file, output_file);
+                } else if (sub_choice == 4) {
+
+                    // Check if the filename ends with .txt or .wav
+                    if (strstr(input_file, ".txt") != NULL) {
+                        printf("The file is a .txt file.\n");
+                        FileData file_data = fileOpen(input_file);
+                        if (file_data.file_content == NULL) {
+                            return 1;
+                        }
+
+                        int compressed_size_huf = huffman_compress(file_data.file_content, input_file);
+                        double compression_ratio_huf = 0;
+                        if (compressed_size_huf != 0) {
+                            printf("Compressed file size: %d bytes\n", compressed_size_huf);
+                            compression_ratio_huf = (double)compressed_size_huf / (double)file_data.file_size;
+                            printf("Compression ratio: %.2f\n", compression_ratio_huf);
+                        }
+
+                        int compressed_size_arc = arithmetic_compress(file_data.file_content, input_file);
+                        double compression_ratio_arc = 0;
+                        if (compressed_size_arc != 0) {
+                        printf("Compressed file size: %d bytes\n", compressed_size_arc);
+                        compression_ratio_arc = (double)compressed_size_arc / (double)file_data.file_size;
+                        printf("Compression ratio: %.2f\n", compression_ratio_arc);
+                        }
+
+                        printf("--------------------------------------------------------------\n\n\n");
+                        printf("huffman compressed ratio: %.2f\n", compression_ratio_huf);
+                        printf("arithmetic compressed ratio: %.2f\n", compression_ratio_arc);
+                        printf("--------------------------------------------------------------\n");
+                        if (compression_ratio_huf > compression_ratio_arc) {
+                            printf("arithmetic compressed ratio is better\n");
+                        } else{
+                            printf("huffman compressed ratio is better\n");
+                        }
+                        printf("--------------------------------------------------------------\n");                        
+                        printf("Which would you prefer\n");
+                        printf("1. Huffman\n");
+                        printf("2. Arithmetic\n");
+                        printf("3. Both\n");
+                        printf("4. None\n");
+                        printf("Enter your choice: ");
+                        int choice;
+                        scanf("%d", &choice);
+                        if (choice == 1) {
+                            printf("Compressed file size: %d bytes\n", compressed_size_huf);
+                            printf("Compression ratio: %.2f\n", compression_ratio_huf);
+                            // Delete the file with .arc extension
+                            char arc_file[256];
+                            snprintf(arc_file, sizeof(arc_file), "%s.arc", input_file);
+                            if (remove(arc_file) != 0) {
+                                printf("Error deleting the file %s.\n", arc_file);
+                            }
+                        } else if (choice == 2) {
+                            printf("Compressed file size: %d bytes\n", compressed_size_arc);
+                            printf("Compression ratio: %.2f\n", compression_ratio_arc);
+
+                            // Delete the file with .huf extension
+                            char huf_file[256];
+                            snprintf(huf_file, sizeof(huf_file), "%s.huf", input_file);
+                            if (remove(huf_file) != 0) {
+                                printf("Error deleting the file %s.\n", huf_file);
+                            }
+                        } else if (choice == 3) {
+                            printf("Compressed file size (Huffman): %d bytes\n", compressed_size_huf);
+                            printf("Compression ratio (Huffman): %.2f\n", compression_ratio_huf);
+                            printf("Compressed file size (Arithmetic): %d bytes\n", compressed_size_arc);
+                            printf("Compression ratio (Arithmetic): %.2f\n", compression_ratio_arc);
+                        } else if (choice == 4) {
+                            printf("No compression chosen.\n");
+                        } else {
+                            printf("Invalid choice. Please try again.\n");
+                        }
+                    
+                        free(file_data.file_content);
+                    
+                    } else if (strstr(input_file, ".wav") != NULL) {
+                        printf("請輸入輸出檔案名稱: ");
+                        scanf("%s", output_file);
+                        compress_audio(input_file, output_file);
+                    } else {
+                        printf("The file is neither .txt nor .wav.\n");
+                    }
                 } else {
                     printf("Invalid choice. Please try again.\n");
                 }
             }
+
+
         } else if (main_choice == 2) {
             // Decompression menu
             while (1) {
@@ -789,7 +887,7 @@ int main() {
                 printf("Enter your choice: ");
                 scanf("%d", &sub_choice);
 
-                if (sub_choice == 4) {
+                if (sub_choice == 5) {
                     break;
                 }
 
@@ -806,7 +904,27 @@ int main() {
                     printf("請輸入輸出檔案名稱: ");
                     scanf("%s", output_file);
                     decompress_audio(input_file, output_file);
-                } else {
+                } else if (sub_choice == 4)
+                {
+                    // Check if the filename ends with .txt or .wav
+                    if (strstr(input_file, ".arc") != NULL) {
+                        printf("The file is a .arc file.\n");
+                        arithmetic_decompress(input_file);
+
+                    } else if (strstr(input_file, ".huf") != NULL) {
+                        printf("The file is a .huf file.\n");
+                        decompress_huffman(input_file);
+                    } 
+                    else if (strstr(input_file, ".wav") != NULL) {
+                        printf("The file is a .wav file.\n");
+                        printf("請輸入輸出檔案名稱: ");
+                        scanf("%s", output_file);
+                        decompress_audio(input_file, output_file);
+                    } else {
+                        printf("The file is neither\n");
+                    }
+                }
+                else {
                     printf("Invalid choice. Please try again.\n");
                 }
             }
