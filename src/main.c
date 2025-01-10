@@ -783,8 +783,10 @@ int main() {
                     int compressed_size = arithmetic_compress(file_data.file_content, input_file);
                     if (compressed_size != 0) {
                         printf("Compressed file size: %d bytes\n", compressed_size);
+
                         double compression_ratio = (double)compressed_size / (double)file_data.file_size * 100.0;
                         printf("Compression ratio: %.2f%%\n", compression_ratio);
+
                     }
                     free(file_data.file_content);
                 } else if (sub_choice == 3) {
@@ -805,14 +807,17 @@ int main() {
                         double compression_ratio_huf = 0;
                         if (compressed_size_huf != 0) {
                             printf("Compressed file size: %d bytes\n", compressed_size_huf);
+                          
                             compression_ratio_huf = (double)compressed_size_huf / (double)file_data.file_size * 100.0;
                             printf("Compression ratio: %.2f%%\n", compression_ratio_huf);
+
                         }
 
                         int compressed_size_arc = arithmetic_compress(file_data.file_content, input_file);
                         double compression_ratio_arc = 0;
                         if (compressed_size_arc != 0) {
                         printf("Compressed file size: %d bytes\n", compressed_size_arc);
+
                         compression_ratio_arc = (double)compressed_size_arc / (double)file_data.file_size * 100.0;
                         printf("Compression ratio: %.2f%%\n", compression_ratio_arc);
                         }
@@ -820,6 +825,7 @@ int main() {
                         printf("--------------------------------------------------------------\n\n\n");
                         printf("huffman compressed ratio: %.2f%%\n", compression_ratio_huf);
                         printf("arithmetic compressed ratio: %.2f%%\n", compression_ratio_arc);
+
                         printf("--------------------------------------------------------------\n");
                         if (compression_ratio_huf > compression_ratio_arc) {
                             printf("arithmetic compressed ratio is better\n");
@@ -837,7 +843,9 @@ int main() {
                         scanf("%d", &choice);
                         if (choice == 1) {
                             printf("Compressed file size: %d bytes\n", compressed_size_huf);
+
                             printf("Compression ratio: %.2f%%\n", compression_ratio_huf);
+
                             // Delete the file with .arc extension
                             char arc_file[256];
                             snprintf(arc_file, sizeof(arc_file), "%s.arc", input_file);
@@ -846,7 +854,9 @@ int main() {
                             }
                         } else if (choice == 2) {
                             printf("Compressed file size: %d bytes\n", compressed_size_arc);
+
                             printf("Compression ratio: %.2f%%\n", compression_ratio_arc);
+
 
                             // Delete the file with .huf extension
                             char huf_file[256];
@@ -856,9 +866,11 @@ int main() {
                             }
                         } else if (choice == 3) {
                             printf("Compressed file size (Huffman): %d bytes\n", compressed_size_huf);
+
                             printf("Compression ratio (Huffman): %.2f%%\n", compression_ratio_huf);
                             printf("Compressed file size (Arithmetic): %d bytes\n", compressed_size_arc);
                             printf("Compression ratio (Arithmetic): %.2f%%\n", compression_ratio_arc);
+
                         } else if (choice == 4) {
                             printf("No compression chosen.\n");
                         } else {
@@ -906,7 +918,9 @@ int main() {
                     decompress_audio(input_file, output_file);
                 } else if (sub_choice == 4)
                 {
+
                     // Check if the filename ends with .txt or .bin
+
                     if (strstr(input_file, ".arc") != NULL) {
                         printf("The file is a .arc file.\n");
                         arithmetic_decompress(input_file);
@@ -915,13 +929,17 @@ int main() {
                         printf("The file is a .huf file.\n");
                         decompress_huffman(input_file);
                     } 
+
                     else if (strstr(input_file, ".bin") != NULL) {
                         printf("The file is a .bin file.\n");
+
                         printf("請輸入輸出檔案名稱: ");
                         scanf("%s", output_file);
                         decompress_audio(input_file, output_file);
                     } else {
+
                         printf("The file is neither arc,huf nor bin.\n");
+
                     }
                 }
                 else {

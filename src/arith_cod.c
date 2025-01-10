@@ -27,6 +27,7 @@ void init_state(ac_state_t* state, int precision)
     assert(state->prob_table && state->cumul_table && "memory allocation failed");
 }
 
+//做出cumul_table
 void transform_count_to_cumul(ac_state_t* state, int _)  
 {
     (void)_; // unused
@@ -35,6 +36,7 @@ void transform_count_to_cumul(ac_state_t* state, int _)
     int alphabet_size = 128;
     for (i = 0; i < alphabet_size; ++i) size += state->prob_table[i];
 
+    // state format & count cumul
     for (i = 0; i < alphabet_size; ++i) {
         int count = state->prob_table[i];
         int local_prob = ((long long) count * ((1 << state->frac_size)-258)) / (size);
@@ -53,10 +55,10 @@ void build_probability_table(ac_state_t* state, const unsigned char* in, int siz
     int alphabet_size = 128;
     int count_weight = 1;
     int i;
-    // reset 
+    // reset 預設值set1
     for (i = 0; i < alphabet_size; ++i) state->prob_table[i] = 1;
 
-    // occurences counting
+    // counting  probability
     for (i = 0; i < size; ++i) state->prob_table[in[i]] += count_weight;
 
     // normalization according to state format
@@ -185,7 +187,7 @@ int state_half_length(ac_state_t* state)
 
 
 int modulo_precision(ac_state_t* state, int value) 
-{
+{   //value%2 的 state->frac_size 次方
     return value % (1 << state->frac_size);
 }
 
@@ -194,6 +196,7 @@ void encode_character(unsigned char* out, unsigned char in, ac_state_t* state)
     int in_cumul   = state->cumul_table[in];
 
     // interval update
+    //Y is new upper bound
     int Y = ((long long) state->length * state->cumul_table[in + 1]) >> state->frac_size;
     int base_increment = ((long long) state->length * in_cumul) >> state->frac_size;
 
@@ -207,7 +210,7 @@ void encode_character(unsigned char* out, unsigned char in, ac_state_t* state)
         propagate_carry(out, state);
     }
 
-
+    //確保範圍足夠大
     while (new_length < state_half_length(state)) {
         // renormalization
         int digit = (new_base * 2) >> state->frac_size;
